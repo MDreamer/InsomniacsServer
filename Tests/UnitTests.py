@@ -23,8 +23,11 @@ class Tests(unittest.TestCase):
     def test_shift_tuple(self):
         self.assertEqual((3, 1, 2), rotation_animation.shift((1, 2, 3)))
 
-    def test_clockwise_rainbow(self):
-        rotation_animation.clockwise_rainbow('192.168.1.44:7890')
+    def test_counter_clockwise_rainbow(self):
+        rotation_animation.counter_clockwise_rainbow('192.168.1.44:7890')
+
+    def test_cone(self):
+        rotation_animation.cone('192.168.1.44:7890')
 
 
 if __name__ == '__main__':
