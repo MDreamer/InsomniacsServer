@@ -8,7 +8,7 @@ import socket
 
 
 class Cluster(threading.Thread):
-    def __init__(self, numNodes, refRate, MCAST_GRP = "192.168.1.255", MCAST_PORT = 4210):
+    def __init__(self, numNodes, refRate, MCAST_GRP = "192.168.0.255", MCAST_PORT = 4210):
         threading.Thread.__init__(self)
         self.numNodes = numNodes
         self.refRate = refRate  #refRate in Hz -> to ms(s) while in the loop
@@ -37,7 +37,7 @@ class Cluster(threading.Thread):
 
     def senddatasocket(self):
         self.sock.sendto(self.dataSocket, (self.MCAST_GRP, self.MCAST_PORT))
-        print('sending data ' + str(self.dataSocket))
+        #print('sending data ' + str(self.dataSocket))
 
     # loop thread
     def loopDataCluster(self):
@@ -48,4 +48,7 @@ class Cluster(threading.Thread):
                 time.sleep(self.refRate)
             except Exception as e:
                 logging.critical(str(e) + ' cannot send data to cluster')
-                time.sleep(self.refRate)
+                time.sleep(3)   #wait 3 second
+                #try to reopen the socket
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
