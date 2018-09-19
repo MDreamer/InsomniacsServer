@@ -193,19 +193,20 @@ def counter_clockwise_rainbow(address='192.168.0.8:7890', fps=100):
             buffer = shift(buffer)  # to make this go clockwise, change the shift count to -1
         time.sleep(1 / fps)
 
-'''
 def radius(coord):
     x = coord[0]
     y = coord[1]
     R = math.sqrt(x ** 2 + y ** 2)
     return R
 
+def find_theta(coord):
+    x,y,z=coord
+    R=radius(coord)
+    theta = math.acos(y/R)
+    if x < 0:
+        theta=math.radians(360)-theta
+    return theta
 
-def pixel_colors(t, state, coord, ii):
-    start = time.time()
-    while t - start < 30:
-        r, g, b = animations.outward_swell(t, coord)
-        my_pixels.append((r, g, b))
 
 def outward_swell(t,coord,my_pixels):
     R = radius(coord)
@@ -216,53 +217,84 @@ def outward_swell(t,coord,my_pixels):
     r,g,b=[color_utils.remap(color,0,1,0,255) for color in (r,g,b)]
     my_pixels.append((r, g, b))
 
-def freda1():
-    last_time = time.time()
-    start_time = time.time()
-    print(start_time)
-    interval = 10
-    state = 0
 
-    num_pixels = len(coordinates)
+def moons_and_planets_blink(t,coord,my_pixels,R_min,R_max): #alternate blinking moons and planets
+    R = radius(coord)
+    x,y,z=coord
+    theta=find_theta(coord)
+    R=color_utils.remap(R,R_min,R_max,0,6)
+    if 2.5 < R < 5.5: #planets
+        r=color_utils.cos(t,offset=1,period=10,minn=10,maxx=100)
+        g=color_utils.cos(t,offset=1,period=10,minn=10,maxx=100)
+        b=color_utils.cos(t,offset=1,period=10,minn=10,maxx=150)
+        r,g,b = [color_utils.remap(color, 0, 255, 0, 1) for color in (r, g, b)]
+        r,g,b=color_utils.gamma((r,g,b),0.8)
+        r,g,b=[color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+    elif R > 5.5 or R<2.5:
+        r=color_utils.cos(t,offset=0.5,period=10,minn=0,maxx=0.6)
+        g=0.2
+        b=color_utils.cos(t,offset=0.5,period=10,minn=0.3,maxx=0.45)
+        r_pattern = color_utils.cos(theta, offset=t/5, period=10, minn=0, maxx=1)
+        #r,g,b = [r_pattern*item for item in (r,g,b)]  ###uncomment this line to add the spiral effect
+        r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+    my_pixels.append((r, g, b))
 
-    R = [radius(coord) for coord in coordinates]
+def moons_spiral(t,coord,my_pixels,R_min,R_max): ##this has the effect of just the outward moon spiraling slowly
+    R = radius(coord)
+    x, y, z = coord
+    theta = find_theta(coord)
+    R = color_utils.remap(R, R_min, R_max, 0, 6)
+    if R > 5.5:
+        r = color_utils.cos(theta, offset=t /10, period=12, minn=0, maxx=1)
+        g = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
+        b = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
+        r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+    else:
+        r,g,b = (20,20,10)
+    my_pixels.append((r,g,b))
 
-    moon_id = []
-    planets_id = []
+def rainbow_wave(t,coord,my_pixels):
+    x=coord[0]
+    y=coord[1]
+    z=coord[2]
+    r = color_utils.cos(x, offset=t/8, period=10, minn=0, maxx=0.8)
+    g = color_utils.cos(y, offset=t/8, period=10, minn=0, maxx=0.8)
+    b = color_utils.cos(z, offset=t/8, period=10, minn=0, maxx=0.8)
+    r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+    my_pixels.append((r,g,b))
 
-    R_max = max(R)
-    R_min = min(R)
+def white_blinking(t,start_time,interval,coord,num_pixels,my_pixels):
+    x,y,z=coord
+    x=x+0.1
+    # if t - start_time > interval / 2:
+    #     x_new=y
+    #     y_new=x
+    #     y=y_new
+    #     x=x_new
+    r=color_utils.cos(x/y + y/z,offset=t/10,period=6,minn=0,maxx=0.4)
+    g = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
+    b = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
+    color=(r,g,b)
+    r,g,b=color_utils.gamma(color,0.5)
+    r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+    my_pixels.append((r,g,b))
 
-    # for i in range(len(R)):
-    #     if 0.7<R[i]<1.3:
-    #         print (R[i])
-    #         planets_id.append(i)
-    #     else:
-    #         moon_id.append(i)
 
-    fps = 100
-    while aniIndex == 0:
-        my_pixels = []
-        t = time.time()
-        if t - start_time > interval:
-            start_time = t
-            print(state)
-            if state == 0:
-                state = 1
-            else:
-                state = 0
-        if state == 0:
-            [animations.outward_swell(t, coord, my_pixels) for coord in coordinates]
-        if state == 1:
-            [animations.moons_and_planets_blink(t, coord, my_pixels, R_min, R_max) for coord in coordinates]
-        if client.put_pixels(my_pixels, channel=0):
-            print
-            'sent'
-        else:
-            print
-            'not connected'
-        time.sleep(1 / fps)
-'''
+####specify location of layout file"
+
+layout='/home/maayand/Documents/Projects/openpixelcontrol/layouts/insomniacs.json'
+
+# Read in coordinates.
+coordinates = []
+for item in json.load(open(layout)):
+    if 'point' in item:
+        coordinates.append(tuple(item['point']))
+
+num_pixels=len(coordinates)
+R=[radius(coord) for coord in coordinates]
+R_max=max(R)
+R_min=min(R)
+
 
 # aniTime is the time that is dedicated per animation in minutes, default is 30min
 class AnimationCycleThread(threading.Thread):
@@ -342,6 +374,8 @@ if __name__ == "__main__":
 
     pygame.mixer.music.set_endevent(SONG_END)
     pygame.mixer.music.load(_songs[0])
+    #pygame.mixer.music.load('/home/maayand/Downloads/music/01 Aphelion.mp3')
+
     pygame.mixer.music.play(1)
 
     # Create new thread
@@ -357,10 +391,10 @@ if __name__ == "__main__":
             if event.type == SONG_END:
                 print(str(_currently_playing_song) + " the song ended!")
                 play_a_different_song()
-                time.sleep(1)
+        time.sleep(1)
 
     # freda() #0
-    # raver_palid() #1
+    # raver_plaid() #1
     # play_rainbow() #2
     # cone() #3
     # counter_clockwise_rainbow() #4
