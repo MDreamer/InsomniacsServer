@@ -48,39 +48,18 @@ num_nodes = 25
 all_nodes = Cluster(num_nodes, 0.01)
 all_nodes.start()
 ADDRESS = 'localhost:7890'
-client = opc.Client(ADDRESS)
-
-def main():
-    # mixer.init()
-    # mixer.music.load('/home/maayand/Downloads/Wonderland_background.mp3')
-    # mixer.music.play(-1)
-
-    # Create a client object
+run_sim = True
+if (run_sim == True):
     client = opc.Client(ADDRESS)
 
-    # Test if it can connect
-    if client.can_connect():
-        print
-        'connected to %s' % ADDRESS
-    else:
-        # We could exit here, but instead let's just print a warning
-        # and then keep trying to send pixels in case the server
-        # appears later
-        print
-        'WARNING: could not connect to %s' % ADDRESS
-
-    # Send pixels forever
-
-    print('    sending pixels forever (control-c to exit)...')
-    print('')
-
+layout_json_path = "C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master\\layouts\\insomniacs.json"
 
 def _get_cartesian_layout():
+    global layout_json_path
     coordinates = []
     lines = []
-    layout_json = '/home/maayand/Documents/Projects/openpixelcontrol/layouts/insomniacs.json'
-
-    for item in json.load(open(layout_json)):
+    
+    for item in json.load(open(layout_json_path)):
         if 'point' in item:
             coordinates.append(tuple(item['point']))
         if 'line' in item:
@@ -89,11 +68,10 @@ def _get_cartesian_layout():
     return coordinates
 
 
-def raver_palid(address='192.168.0.8:7890', fps=100, n_pixels=25):
+def raver_palid(fps=100, n_pixels=25):
     global aniIndex, client
     print ("Raver")
     start_time = time.time()
-    #client = opc.Client('localhost:7890')
 
     # how many sine wave cycles are squeezed into our n_pixels
     # 24 happens to create nice diagonal stripes on the wall layout
@@ -123,7 +101,9 @@ def raver_palid(address='192.168.0.8:7890', fps=100, n_pixels=25):
             pixels.append((r, g, b))
             all_nodes.setNodeColor(int(ii), int(r), int(g), int(b))
 
-        client.put_pixels(pixels, channel=0)
+        if (run_sim == True):
+            client.put_pixels(pixels, channel=0)
+
         time.sleep(1 / fps)
 
 
@@ -138,10 +118,10 @@ def inf_loop(counter, in_aniIndex, increment=1):
             yield i
 
 
-def cone(address='192.168.0.8:7890', fps=100):
+def cone(fps=100):
     global aniIndex, client
     print("cone")
-    #client = opc.Client('localhost:7890')
+    
     for i in inf_loop(360 * 2, aniIndex, 1):
         pixels = []
         for x, y, z in _get_cartesian_layout():
@@ -150,7 +130,10 @@ def cone(address='192.168.0.8:7890', fps=100):
             dist = math.sqrt((midx - x) ** 2 + (midy - y) ** 2)
             val = dist * 255 / 3
             pixels.append((val, 0, 128))
-        client.put_pixels(pixels, channel=0)
+        
+        if (run_sim == True):
+            client.put_pixels(pixels, channel=0)
+
         time.sleep(1 / fps)
 
 
@@ -163,10 +146,10 @@ def rainbow_stream():
         for j in range(255):
             yield shift((255 - j, j, 0), i)
 
-def play_rainbow(address='192.168.0.8:7890', fps=100):
+def play_rainbow(fps=100):
     global aniIndex, client
     print("Rainbow")
-    #client = opc.Client('localhost:7890')
+    
     # play with this constant for "color distance"
     # at 200, the inner moon would take a different color to the outer one
     # at 10, the transition would take a lot longer
@@ -174,21 +157,23 @@ def play_rainbow(address='192.168.0.8:7890', fps=100):
     buffer = [x for x in rainbow_stream()]
     for i in inf_loop(360 * 2, aniIndex, 1):
         pixels = [buffer[bands[x]] for x in range(len(bands))]
-        client.put_pixels(pixels)
+        if (run_sim == True):
+            client.put_pixels(pixels)
         if i % 1 == 0:
             buffer = shift(buffer)  # change the shift to -1 for an ingoing action
         time.sleep(1 / fps)
 
 
-def counter_clockwise_rainbow(address='192.168.0.8:7890', fps=100):
+def counter_clockwise_rainbow(fps=100):
     global aniIndex, client
     print("ccw rainbow")
-    #client = opc.Client('localhost:7890')
+    
     buffer = [x for x in rainbow_stream()]
     slices = [math.floor(x[1] * len(buffer) / (2 * math.pi)) for x in _get_polar_layout()]
     for i in inf_loop(360 * 2,aniIndex, 1):
         pixels = [buffer[slices[x]] for x in range(len(slices))]
-        client.put_pixels(pixels)
+        if (run_sim == True):
+            client.put_pixels(pixels)
         if i % 1 == 0:  # pick a higher mod to slow the animation down (2 would halve the speed etc)
             buffer = shift(buffer)  # to make this go clockwise, change the shift count to -1
         time.sleep(1 / fps)
@@ -208,17 +193,28 @@ def find_theta(coord):
     return theta
 
 
-def outward_swell(t,coord,my_pixels):
-    R = radius(coord)
-    g=0.2
-    b=color_utils.cos(R,offset=t/8,period=10,minn=0.3,maxx=0.45)
-    r=color_utils.cos(R,offset=t/8,period=10,minn=0,maxx=0.50)
-    r, g, b = color_utils.gamma((r, g, b), 0.7)
-    r,g,b=[color_utils.remap(color,0,1,0,255) for color in (r,g,b)]
-    my_pixels.append((r, g, b))
+def outward_swell(fps=100, in_aniIndex = 0):
+    global aniIndex, client, coordinates
+    pixels = []
+    print("outward_swell")
+    while (aniIndex == in_aniIndex):
+        t=time.time()
+        for coord in coordinates:
+            R = radius(coord)
+            g=0.2
+            b=color_utils.cos(R,offset=t/8,period=10,minn=0.3,maxx=0.45)
+            r=color_utils.cos(R,offset=t/8,period=10,minn=0,maxx=0.50)
+            r, g, b = color_utils.gamma((r, g, b), 0.7)
+            r,g,b=[color_utils.remap(color,0,1,0,255) for color in (r,g,b)]
+            pixels.append((r, g, b))
+            
+            if (run_sim == True):
+                client.put_pixels(pixels)
+
+        time.sleep(1 / fps)
 
 
-def moons_and_planets_blink(t,coord,my_pixels,R_min,R_max): #alternate blinking moons and planets
+def moons_and_planets_blink(t, coord, my_pixels, R_min, R_max, fps=100): #alternate blinking moons and planets
     R = radius(coord)
     x,y,z=coord
     theta=find_theta(coord)
@@ -239,7 +235,7 @@ def moons_and_planets_blink(t,coord,my_pixels,R_min,R_max): #alternate blinking 
         r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
     my_pixels.append((r, g, b))
 
-def moons_spiral(t,coord,my_pixels,R_min,R_max): ##this has the effect of just the outward moon spiraling slowly
+def moons_spiral(t, coord, my_pixels, R_min, R_max, fps=100): ##this has the effect of just the outward moon spiraling slowly
     R = radius(coord)
     x, y, z = coord
     theta = find_theta(coord)
@@ -253,7 +249,7 @@ def moons_spiral(t,coord,my_pixels,R_min,R_max): ##this has the effect of just t
         r,g,b = (20,20,10)
     my_pixels.append((r,g,b))
 
-def rainbow_wave(t,coord,my_pixels):
+def rainbow_wave(t, coord, my_pixels, fps=100):
     x=coord[0]
     y=coord[1]
     z=coord[2]
@@ -263,7 +259,7 @@ def rainbow_wave(t,coord,my_pixels):
     r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
     my_pixels.append((r,g,b))
 
-def white_blinking(t,start_time,interval,coord,num_pixels,my_pixels):
+def white_blinking(t, start_time, interval, coord, num_pixels ,my_pixels, fps=100):
     x,y,z=coord
     x=x+0.1
     # if t - start_time > interval / 2:
@@ -282,11 +278,11 @@ def white_blinking(t,start_time,interval,coord,num_pixels,my_pixels):
 
 ####specify location of layout file"
 
-layout='/home/maayand/Documents/Projects/openpixelcontrol/layouts/insomniacs.json'
+#layout='C:\Users\maayan.dermer\Downloads\InsomniacsServer-master\InsomniacsServer-master\layouts\insomniacs.json'
 
 # Read in coordinates.
 coordinates = []
-for item in json.load(open(layout)):
+for item in json.load(open(layout_json_path)):
     if 'point' in item:
         coordinates.append(tuple(item['point']))
 
@@ -329,8 +325,8 @@ class AnimationPlayThread(threading.Thread):
     def play_time(self):
         global aniIndex, _currently_playing_song, _songs
         while exitFlag != 1:
-            #if aniIndex == 0:
-            #    freda()
+            if aniIndex == 0:
+                outward_swell()
             if aniIndex == 1:
                 raver_palid()
             if aniIndex == 2:
@@ -339,6 +335,14 @@ class AnimationPlayThread(threading.Thread):
                 cone()
             if aniIndex == 4:
                 counter_clockwise_rainbow()
+            if aniIndex == 5:
+                [moons_and_planets_blink(t,coord,my_pixels,R_min,R_max) for coord in coordinates]
+            if aniIndex == 6:
+                [rainbow_wave(t,coord,my_pixels) for ii,coord in enumerate(coordinates)]
+            if aniIndex == 7:
+                [white_blinking(t, start_time, interval, coord, num_pixels, my_pixels) for coord in coordinates]
+            if aniIndex == 8:
+                [moons_spiral(t,coord,my_pixels,R_min,R_max) for coord in coordinates]
             time.sleep(1)
             print (aniIndex)
 
@@ -350,15 +354,28 @@ def play_a_different_song():
     while next_song == _currently_playing_song:
         next_song = random.choice(_songs)
     _currently_playing_song = next_song
-    print(str(_currently_playing_song) + " is played now...")
+    #print(str(_currently_playing_song) + " is played now...")
     pygame.mixer.music.load(next_song)
     pygame.mixer.music.play(1)
 
 
 if __name__ == "__main__":
-    music_path = '/home/maayand/Downloads/music'
+    music_path = 'C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master'
+    
+    if (run_sim == True):
+        client = opc.Client('localhost:7890')
+        # Test if it can connect
+        if client.can_connect():
+            print
+            'connected to %s' % ADDRESS
+        else:
+            # We could exit here, but instead let's just print a warning
+            # and then keep trying to send pixels in case the server
+            # appears later
+            print
+            'WARNING: could not connect to %s' % ADDRESS
 
-    client = opc.Client('localhost:7890')
+            # Send pixels forever
 
     for file in os.listdir(music_path):
         if file.endswith(".mp3"):
@@ -389,7 +406,7 @@ if __name__ == "__main__":
     while True:
         for event in pygame.event.get():
             if event.type == SONG_END:
-                print(str(_currently_playing_song) + " the song ended!")
+                #print(str(_currently_playing_song) + " the song ended!")
                 play_a_different_song()
         time.sleep(1)
 
