@@ -34,7 +34,7 @@ import opc
 import color_utils
 import threading
 
-aniIndex = 0  # Index that indicates which animation to run:
+aniIndex = 5  # Index that indicates which animation to run:
 exitFlag = 0
 
 # freda() #0
@@ -52,7 +52,8 @@ run_sim = True
 if (run_sim == True):
     client = opc.Client(ADDRESS)
 
-layout_json_path = "C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master\\layouts\\insomniacs.json"
+layout_json_path = '/home/maayand/Documents/Projects/InsomniacsServer/layouts/insomniacs.json'
+#layout_json_path = "C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master\\layouts\\insomniacs.json"
 
 def _get_cartesian_layout():
     global layout_json_path
@@ -195,9 +196,9 @@ def find_theta(coord):
 
 def outward_swell(fps=100, in_aniIndex = 0):
     global aniIndex, client, coordinates
-    pixels = []
     print("outward_swell")
     while (aniIndex == in_aniIndex):
+        pixels = []
         t=time.time()
         for coord in coordinates:
             R = radius(coord)
@@ -214,26 +215,39 @@ def outward_swell(fps=100, in_aniIndex = 0):
         time.sleep(1 / fps)
 
 
-def moons_and_planets_blink(t, coord, my_pixels, R_min, R_max, fps=100): #alternate blinking moons and planets
-    R = radius(coord)
-    x,y,z=coord
-    theta=find_theta(coord)
-    R=color_utils.remap(R,R_min,R_max,0,6)
-    if 2.5 < R < 5.5: #planets
-        r=color_utils.cos(t,offset=1,period=10,minn=10,maxx=100)
-        g=color_utils.cos(t,offset=1,period=10,minn=10,maxx=100)
-        b=color_utils.cos(t,offset=1,period=10,minn=10,maxx=150)
-        r,g,b = [color_utils.remap(color, 0, 255, 0, 1) for color in (r, g, b)]
-        r,g,b=color_utils.gamma((r,g,b),0.8)
-        r,g,b=[color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
-    elif R > 5.5 or R<2.5:
-        r=color_utils.cos(t,offset=0.5,period=10,minn=0,maxx=0.6)
-        g=0.2
-        b=color_utils.cos(t,offset=0.5,period=10,minn=0.3,maxx=0.45)
-        r_pattern = color_utils.cos(theta, offset=t/5, period=10, minn=0, maxx=1)
-        #r,g,b = [r_pattern*item for item in (r,g,b)]  ###uncomment this line to add the spiral effect
-        r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
-    my_pixels.append((r, g, b))
+def moons_and_planets_blink(R_min, R_max, fps=100, in_aniIndex = 5): #alternate blinking moons and planets
+    global aniIndex, client, coordinates
+    print("moons_and_planets_blink")
+    while (aniIndex == in_aniIndex):
+        pixels = []
+        t = time.time()
+        for coord in coordinates:
+            R = radius(coord)
+            x, y, z = coord
+            theta = find_theta(coord)
+            R = color_utils.remap(R, R_min, R_max, 0, 6)
+            if 2.5 < R < 5.5:  # planets
+                r = color_utils.cos(t, offset=1, period=10, minn=10, maxx=100)
+                g = color_utils.cos(t, offset=1, period=10, minn=10, maxx=100)
+                b = color_utils.cos(t, offset=1, period=10, minn=10, maxx=150)
+                r, g, b = [color_utils.remap(color, 0, 255, 0, 1) for color in (r, g, b)]
+                r, g, b = color_utils.gamma((r, g, b), 0.8)
+                r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+            elif R > 5.5 or R < 2.5:
+                r = color_utils.cos(t, offset=0.5, period=10, minn=0, maxx=0.6)
+                g = 0.2
+                b = color_utils.cos(t, offset=0.5, period=10, minn=0.3, maxx=0.45)
+                r_pattern = color_utils.cos(theta, offset=t / 5, period=10, minn=0, maxx=1)
+                # r,g,b = [r_pattern*item for item in (r,g,b)]  ###uncomment this line to add the spiral effect
+                r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+            pixels.append((r, g, b))
+
+            if (run_sim == True):
+                client.put_pixels(pixels)
+
+        time.sleep(1 / fps)
+
+
 
 def moons_spiral(t, coord, my_pixels, R_min, R_max, fps=100): ##this has the effect of just the outward moon spiraling slowly
     R = radius(coord)
@@ -309,7 +323,7 @@ class AnimationCycleThread(threading.Thread):
             #time.sleep(self.aniTime * 60)
             time.sleep(10)
             aniIndex = aniIndex + 1
-            aniIndex = aniIndex % 5
+            aniIndex = aniIndex % 6
 
 
 # aniTime is the time that is dedicated per animation in minutes, default is 30min
@@ -336,7 +350,7 @@ class AnimationPlayThread(threading.Thread):
             if aniIndex == 4:
                 counter_clockwise_rainbow()
             if aniIndex == 5:
-                [moons_and_planets_blink(t,coord,my_pixels,R_min,R_max) for coord in coordinates]
+                moons_and_planets_blink(R_min,R_max)
             if aniIndex == 6:
                 [rainbow_wave(t,coord,my_pixels) for ii,coord in enumerate(coordinates)]
             if aniIndex == 7:
@@ -360,8 +374,9 @@ def play_a_different_song():
 
 
 if __name__ == "__main__":
-    music_path = 'C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master'
-    
+    #music_path = 'C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master'
+    music_path = '/home/maayand/Documents/Projects/InsomniacsServer'
+
     if (run_sim == True):
         client = opc.Client('localhost:7890')
         # Test if it can connect
