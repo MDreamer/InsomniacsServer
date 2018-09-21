@@ -34,26 +34,31 @@ import opc
 import color_utils
 import threading
 
-aniIndex = 5  # Index that indicates which animation to run:
+aniIndex = 0  # Index that indicates which animation to run:
+num_animations = 9 #the number of animations to cycle through
 exitFlag = 0
 
-# freda() #0
-# raver_palid() #1
+# outward_swell() #0
+# raver_plaid() #1
 # play_rainbow() #2
 # cone() #3
 # counter_clockwise_rainbow() #4
+# moons_and_planets_blink(R_min,R_max) #5
+# rainbow_wave(t,coord,my_pixels) #6
+# white_blinking(t, start_time, interval, coord, num_pixels, my_pixels) #7
+# moons_spiral(t,coord,my_pixels,R_min,R_max) #8
 
 
 num_nodes = 25
 all_nodes = Cluster(num_nodes, 0.01)
 all_nodes.start()
 ADDRESS = 'localhost:7890'
-run_sim = True
+run_sim = False
 if (run_sim == True):
     client = opc.Client(ADDRESS)
 
-layout_json_path = '/home/maayand/Documents/Projects/InsomniacsServer/layouts/insomniacs.json'
-#layout_json_path = "C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master\\layouts\\insomniacs.json"
+#layout_json_path = '/home/maayand/Documents/Projects/InsomniacsServer/layouts/insomniacs.json'
+layout_json_path = "C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master\\layouts\\insomniacs.json"
 
 def _get_cartesian_layout():
     global layout_json_path
@@ -96,9 +101,9 @@ def raver_palid(fps=100, n_pixels=25):
             blackstripes_offset = color_utils.cos(t, offset=0.9, period=60, minn=-0.5, maxx=3)
             blackstripes = color_utils.clamp(blackstripes + blackstripes_offset, 0, 1)
             # 3 sine waves for r, g, b which are out of sync with each other
-            r = blackstripes * color_utils.remap(math.cos((t / speed_r + pct * freq_r) * math.pi * 2), -1, 1, 0, 256)
-            g = blackstripes * color_utils.remap(math.cos((t / speed_g + pct * freq_g) * math.pi * 2), -1, 1, 0, 256)
-            b = blackstripes * color_utils.remap(math.cos((t / speed_b + pct * freq_b) * math.pi * 2), -1, 1, 0, 256)
+            r = blackstripes * color_utils.remap(math.cos((t / speed_r + pct * freq_r) * math.pi * 2), -1, 1, 0, 255)
+            g = blackstripes * color_utils.remap(math.cos((t / speed_g + pct * freq_g) * math.pi * 2), -1, 1, 0, 255)
+            b = blackstripes * color_utils.remap(math.cos((t / speed_b + pct * freq_b) * math.pi * 2), -1, 1, 0, 255)
             pixels.append((r, g, b))
             all_nodes.setNodeColor(int(ii), int(r), int(g), int(b))
 
@@ -125,13 +130,15 @@ def cone(fps=100):
     
     for i in inf_loop(360 * 2, aniIndex, 1):
         pixels = []
+        ii=0
         for x, y, z in _get_cartesian_layout():
             midx = math.sin(i * math.pi / 180)
             midy = math.cos(i * math.pi / 180)
             dist = math.sqrt((midx - x) ** 2 + (midy - y) ** 2)
             val = dist * 255 / 3
             pixels.append((val, 0, 128))
-        
+            all_nodes.setNodeColor(int(ii), int(val), int(0), int(128))
+
         if (run_sim == True):
             client.put_pixels(pixels, channel=0)
 
@@ -156,12 +163,18 @@ def play_rainbow(fps=100):
     # at 10, the transition would take a lot longer
     bands = [math.floor(x[0] * 200) for x in _get_polar_layout()]
     buffer = [x for x in rainbow_stream()]
+
     for i in inf_loop(360 * 2, aniIndex, 1):
         pixels = [buffer[bands[x]] for x in range(len(bands))]
+        
+        for ii in range(len(pixels)):
+            all_nodes.setNodeColor(int(ii), pixels[ii][0],pixels[ii][1],pixels[ii][2])
+        
         if (run_sim == True):
             client.put_pixels(pixels)
         if i % 1 == 0:
             buffer = shift(buffer)  # change the shift to -1 for an ingoing action
+
         time.sleep(1 / fps)
 
 
@@ -172,9 +185,17 @@ def counter_clockwise_rainbow(fps=100):
     buffer = [x for x in rainbow_stream()]
     slices = [math.floor(x[1] * len(buffer) / (2 * math.pi)) for x in _get_polar_layout()]
     for i in inf_loop(360 * 2,aniIndex, 1):
+
         pixels = [buffer[slices[x]] for x in range(len(slices))]
+
+        #send to HW
+        for ii in range(len(pixels)):
+            all_nodes.setNodeColor(int(ii), pixels[ii][0],pixels[ii][1],pixels[ii][2])
+
+        #Send to sim
         if (run_sim == True):
             client.put_pixels(pixels)
+
         if i % 1 == 0:  # pick a higher mod to slow the animation down (2 would halve the speed etc)
             buffer = shift(buffer)  # to make this go clockwise, change the shift count to -1
         time.sleep(1 / fps)
@@ -208,8 +229,13 @@ def outward_swell(fps=100, in_aniIndex = 0):
             r, g, b = color_utils.gamma((r, g, b), 0.7)
             r,g,b=[color_utils.remap(color,0,1,0,255) for color in (r,g,b)]
             pixels.append((r, g, b))
-            
-            if (run_sim == True):
+        
+        #send to HW
+        for ii in range(len(pixels)):
+                all_nodes.setNodeColor(int(ii), int(pixels[ii][0]),int(pixels[ii][1]),int(pixels[ii][2]))
+
+        #Send to sim
+        if (run_sim == True):
                 client.put_pixels(pixels)
 
         time.sleep(1 / fps)
@@ -242,53 +268,103 @@ def moons_and_planets_blink(R_min, R_max, fps=100, in_aniIndex = 5): #alternate 
                 r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
             pixels.append((r, g, b))
 
-            if (run_sim == True):
+        #send to HW
+        for ii in range(len(pixels)):
+                all_nodes.setNodeColor(int(ii), int(pixels[ii][0]),int(pixels[ii][1]),int(pixels[ii][2]))
+
+        #Send to sim
+        if (run_sim == True):
                 client.put_pixels(pixels)
 
         time.sleep(1 / fps)
 
+def rainbow_wave(in_aniIndex = 6, fps=100):
+    global aniIndex, client, coordinates
+    print("rainbow_wave")
+    while (aniIndex == in_aniIndex):
+        pixels = []
+        t = time.time()
+        for coord in coordinates:
+            x=coord[0]
+            y=coord[1]
+            z=coord[2]
+            r = color_utils.cos(x, offset=t/8, period=10, minn=0, maxx=0.8)
+            g = color_utils.cos(y, offset=t/8, period=10, minn=0, maxx=0.8)
+            b = color_utils.cos(z, offset=t/8, period=10, minn=0, maxx=0.8)
+            r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+            pixels.append((r,g,b))
 
+        #send to HW
+        for ii in range(len(pixels)):
+                all_nodes.setNodeColor(int(ii), int(pixels[ii][0]),int(pixels[ii][1]),int(pixels[ii][2]))
 
-def moons_spiral(t, coord, my_pixels, R_min, R_max, fps=100): ##this has the effect of just the outward moon spiraling slowly
-    R = radius(coord)
-    x, y, z = coord
-    theta = find_theta(coord)
-    R = color_utils.remap(R, R_min, R_max, 0, 6)
-    if R > 5.5:
-        r = color_utils.cos(theta, offset=t /10, period=12, minn=0, maxx=1)
-        g = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
-        b = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
-        r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
-    else:
-        r,g,b = (20,20,10)
-    my_pixels.append((r,g,b))
+        #Send to sim
+        if (run_sim == True):
+                client.put_pixels(pixels)
 
-def rainbow_wave(t, coord, my_pixels, fps=100):
-    x=coord[0]
-    y=coord[1]
-    z=coord[2]
-    r = color_utils.cos(x, offset=t/8, period=10, minn=0, maxx=0.8)
-    g = color_utils.cos(y, offset=t/8, period=10, minn=0, maxx=0.8)
-    b = color_utils.cos(z, offset=t/8, period=10, minn=0, maxx=0.8)
-    r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
-    my_pixels.append((r,g,b))
+        time.sleep(1 / fps)
 
-def white_blinking(t, start_time, interval, coord, num_pixels ,my_pixels, fps=100):
-    x,y,z=coord
-    x=x+0.1
-    # if t - start_time > interval / 2:
-    #     x_new=y
-    #     y_new=x
-    #     y=y_new
-    #     x=x_new
-    r=color_utils.cos(x/y + y/z,offset=t/10,period=6,minn=0,maxx=0.4)
-    g = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
-    b = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
-    color=(r,g,b)
-    r,g,b=color_utils.gamma(color,0.5)
-    r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
-    my_pixels.append((r,g,b))
+def white_blinking(in_aniIndex = 7, fps=100):
+    global aniIndex, client, coordinates
+    print("white_blinking")
+    while (aniIndex == in_aniIndex):
+        pixels = []
+        t = time.time()
+        for coord in coordinates:
+            x,y,z=coord
+            x=x+0.1
+            # if t - start_time > interval / 2:
+            #     x_new=y
+            #     y_new=x
+            #     y=y_new
+            #     x=x_new
+            r=color_utils.cos(x/y + y/z,offset=t/10,period=6,minn=0,maxx=0.4)
+            g = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
+            b = color_utils.cos(x / y + y / z, offset=t / 10, period=6, minn=0, maxx=0.4)
+            color=(r,g,b)
+            r,g,b=color_utils.gamma(color,0.5)
+            r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+            pixels.append((r,g,b))
 
+        #send to HW
+        for ii in range(len(pixels)):
+                all_nodes.setNodeColor(int(ii), int(pixels[ii][0]),int(pixels[ii][1]),int(pixels[ii][2]))
+
+        #Send to sim
+        if (run_sim == True):
+                client.put_pixels(pixels)
+
+        time.sleep(1 / fps)
+
+def moons_spiral(R_min, R_max, in_aniIndex = 8, fps=100): ##this has the effect of just the outward moon spiraling slowly
+    global aniIndex, client, coordinates
+    print("moons_spiral")
+    while (aniIndex == in_aniIndex):
+        pixels = []
+        t = time.time()
+        for coord in coordinates:
+            
+            R = radius(coord)
+            x, y, z = coord
+            theta = find_theta(coord)
+            R = color_utils.remap(R, R_min, R_max, 0, 6)
+
+            if R > 5.5:
+                r = color_utils.cos(theta, offset=t /10, period=12, minn=0, maxx=1)
+                g = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
+                b = color_utils.cos(theta, offset=t / 10, period=12, minn=0, maxx=1)
+                r, g, b = [color_utils.remap(color, 0, 1, 0, 255) for color in (r, g, b)]
+            else:
+                r,g,b = (20,20,10)
+            pixels.append((r,g,b))
+
+        #send to HW
+        for ii in range(len(pixels)):
+            all_nodes.setNodeColor(int(ii), int(pixels[ii][0]),int(pixels[ii][1]),int(pixels[ii][2]))
+
+        #Send to sim
+        if (run_sim == True):
+            client.put_pixels(pixels)
 
 ####specify location of layout file"
 
@@ -323,7 +399,7 @@ class AnimationCycleThread(threading.Thread):
             #time.sleep(self.aniTime * 60)
             time.sleep(10)
             aniIndex = aniIndex + 1
-            aniIndex = aniIndex % 6
+            aniIndex = aniIndex % num_animations
 
 
 # aniTime is the time that is dedicated per animation in minutes, default is 30min
@@ -352,13 +428,13 @@ class AnimationPlayThread(threading.Thread):
             if aniIndex == 5:
                 moons_and_planets_blink(R_min,R_max)
             if aniIndex == 6:
-                [rainbow_wave(t,coord,my_pixels) for ii,coord in enumerate(coordinates)]
+                rainbow_wave()
             if aniIndex == 7:
-                [white_blinking(t, start_time, interval, coord, num_pixels, my_pixels) for coord in coordinates]
+                white_blinking()
             if aniIndex == 8:
-                [moons_spiral(t,coord,my_pixels,R_min,R_max) for coord in coordinates]
+                moons_spiral(R_min,R_max)
             time.sleep(1)
-            print (aniIndex)
+            #print (aniIndex)
 
 
 # And write a function that chooses a different song randomly that gets called each time the SONG_END event is fired:
@@ -368,14 +444,14 @@ def play_a_different_song():
     while next_song == _currently_playing_song:
         next_song = random.choice(_songs)
     _currently_playing_song = next_song
-    #print(str(_currently_playing_song) + " is played now...")
+    print(str(_currently_playing_song) + " is played now...")
     pygame.mixer.music.load(next_song)
     pygame.mixer.music.play(1)
 
 
 if __name__ == "__main__":
-    #music_path = 'C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master'
-    music_path = '/home/maayand/Documents/Projects/InsomniacsServer'
+    music_path = 'C:\\Users\\maayan.dermer\\Downloads\\InsomniacsServer-master\\InsomniacsServer-master'
+    #music_path = '/home/maayand/Documents/Projects/InsomniacsServer'
 
     if (run_sim == True):
         client = opc.Client('localhost:7890')
@@ -397,7 +473,8 @@ if __name__ == "__main__":
             print(os.path.join(music_path, file))
             if file != None and file != "":
                 _songs.append(os.path.join(music_path, file))
-
+    
+    #outward_swell()
 
     pygame.init()
     pygame.mixer.init()
@@ -421,12 +498,19 @@ if __name__ == "__main__":
     while True:
         for event in pygame.event.get():
             if event.type == SONG_END:
-                #print(str(_currently_playing_song) + " the song ended!")
+                print(str(_currently_playing_song) + " the song ended!")
                 play_a_different_song()
         time.sleep(1)
 
-    # freda() #0
+    
+            
+    # outward_swell() #0
     # raver_plaid() #1
     # play_rainbow() #2
     # cone() #3
     # counter_clockwise_rainbow() #4
+    # moons_and_planets_blink(R_min,R_max) #5
+    # rainbow_wave(t,coord,my_pixels) #6
+    # white_blinking(t, start_time, interval, coord, num_pixels, my_pixels) #7
+    # moons_spiral(t,coord,my_pixels,R_min,R_max) #8
+    
